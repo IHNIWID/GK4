@@ -1,17 +1,9 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package grafikappm;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 
-/**
- *
- * @author szafa
- */
 public class Processing {
 
     int[] lut;
@@ -44,6 +36,14 @@ public class Processing {
             }
         }
         changePxel(image);
+    }
+    
+    public void backChange(BufferedImage image, BufferedImage original){
+        for(int i = 0 ; i < image.getWidth(); i++){
+            for( int j = 0 ; j < image.getHeight(); j++){
+                image.setRGB(i, j, original.getRGB(i, j));
+            }
+        }
     }
 
     public void changePxel(BufferedImage image) {

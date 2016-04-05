@@ -1,111 +1,100 @@
-/**
- * Created by Jakub Tomczuk on 05.04.2016.
- */
-import java.io.File;
-import java.io.IOException;
 
-import java.io.EOFException;
-import java.io.FileInputStream;
+package grafikappm;
 
 import java.awt.image.BufferedImage;
-import java.io.DataInputStream;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.FileSystemException;
 
-/** Define ppm files load/save */
 
-class ppm {
+public class PPM {
 
-    public int width = -1;
-    public int height = -1;
-    private int width_height;
-    BufferedImage ppmi;
+    FileInputStream stream;
 
-    @SuppressWarnings({ "deprecation" })
-    public ppm load(String file) throws IOException {
-
-        if (file.startsWith("file:"))
-            file = file.substring(5);
-
-        DataInputStream f = new DataInputStream(new FileInputStream(new File(file)));
-        String h = readLine(f);
-
-        if (h.equals("P6")) { // PPM PM6
-            set(f);
-            ppmi = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            byte bytes[] = new byte[3 * width_height];
-            f.read(bytes);
-            for (int i = 0, k = 0; i < width_height; i++) {
-                int red = intValue(bytes[k++]);
-                int green = intValue(bytes[k++]);
-                int blue = intValue(bytes[k++]);
-                ppmi.setRGB(i % width, i / width, (red & 0xFF) << 16 | (green & 0xFF) << 8 | (blue & 0xFF));
-
-            }
-            f.close();
-        } else if (h.equals("P3")) { // PPM PM3
-            set(f);
-            ppmi = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            int reds = 0;
-            int greens = 0;
-            int blues = 0;
-
-            for (int i = 0; i < width_height * 3; i++) {
-
-                String check = f.readLine();
+    public BufferedImage createImage(String path) throws FileNotFoundException, IOException {
+        byte[] bufor = new byte[1024];
+        stream = new FileInputStream(path);
+        BufferedInputStream bufstream = new BufferedInputStream(stream, 1024);
+        String format;
+        if ((char) bufstream.read() == 'P' && (char) bufstream.read() == '3') {
+            format = "P3";
+        } else {
+            format = "P6";
+        }
+        char c = ' ';
+        int width = 0, height = 0, maxValue = 0;
+        for (int i = 0;;) {
+            do {
+                if (!Character.isWhitespace(c)) {
+                    break;
+                }
+            } while (Character.isWhitespace(c = (char) bufstream.read()));
+            if (c == '#') {
+                while ((c = (char) bufstream.read()) != '\n');
+            } else {
+                if (i == 3) {
+                    break;
+                }
+                if (!Character.isDigit(c)) {
+                    throw new FileSystemException("Złe dane w pliku!");
+                }
+                String s = "";
+                do {
+                    s += c;
+                } while (Character.isDigit(c = (char) bufstream.read()));
                 if (i % 3 == 0) {
-
-                    reds = Integer.parseInt(check);
+                    width = Integer.parseInt(s);
                 }
                 if (i % 3 == 1) {
-
-                    greens = Integer.parseInt(check);
+                    height = Integer.parseInt(s);
                 }
                 if (i % 3 == 2) {
-
-                    blues = Integer.parseInt(check);
+                    maxValue = Integer.parseInt(s);
                 }
-                ppmi.setRGB((i / 3) % width, i / 3 / width,
-                        (reds & 0xFF) << 16 | (greens & 0xFF) << 8 | (blues & 0xFF));
-
-
+                i++;
             }
-            f.close();
+        }
+        BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        int r = 0, g = 0, b = 0;
+        if (format.equals("P6")) {
+            int data = (int) c;
+            for (int i = 0; data != -1; i++) {
+                if (i % 3 == 0) {
+                    r = data;
+                }
+                if (i % 3 == 1) {
+                    g = data;
+                }
+                if (i % 3 == 2) {
+                    b = data;
+                    bi.setRGB((i / 3) % width, i / 3 / width, (r ) << 16 | (g) << 8 | (b ));
+                }
+                data = bufstream.read();
+            }
         } else {
-            f.close();
-            throw new IOException("Bad file format: not a PPM/PGM raw format");
+            for (int i = 0; i < width * height * 3; i++) {
+                String data2 = "";
+                while (Character.isWhitespace(c = (char) bufstream.read()));
+                while (Character.isDigit(c)) {
+                    data2 += c;
+                    c = (char) bufstream.read();
+                }
+                int value = Integer.parseInt(data2);
+                if (i % 3 == 0) {
+                    r = value;
+                }
+                if (i % 3 == 1) {
+                    g = value;
+                }
+                if (i % 3 == 2) {
+                    b = value;
+                    bi.setRGB((i / 3) % width, i / 3 / width, (r & 0xFF) << 16 | (g & 0xFF) << 8 | (b & 0xFF));
+
+                }
+            }
         }
-        return this;
+        return bi;
     }
-
-    private void set(DataInputStream f) throws IOException {
-        String l;
-        while ((l = readLine(f)).startsWith("#"))
-            ;
-        try {
-            width = new Integer(l.substring(0, l.indexOf(' '))).intValue();
-            height = new Integer(l.substring(l.indexOf(' ') + 1)).intValue();
-            width_height = width * height;
-            // pixels = new int[width_height];
-        } catch (NumberFormatException e) {
-            throw new IOException("Bad file sizes format");
-        }
-        if (!readLine(f).equals("255"))
-            throw new IOException("Bad PPM/PGM file format");
-    }
-
-    private static int intValue(byte b) {
-        return (b < 0) ? (256 + b) : b;
-    }
-
-    private static String readLine(DataInputStream f) throws IOException {
-        StringBuffer s = new StringBuffer();
-        try {
-            char c;
-            while ((c = (char) f.readByte()) != '\n')
-                s.append(c);
-        } catch (EOFException e) {
-        }
-        return s.toString();
-    }
-
 }
-
